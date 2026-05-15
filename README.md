@@ -1,107 +1,117 @@
 # script-for-conclude
 
-Automação local para a Sala de Aula Virtual da Wyden (`estudante.wyden.com.br`).
-Percorre todas as disciplinas do aluno, entra em cada tema pendente, espera o cronômetro de estudo mínimo e clica em **"Marcar como concluído"** automaticamente.
+Cansou de ficar 15 minutos olhando pra tela esperando o botão "Marcar como concluído" habilitar? Este script faz isso pra você.
 
-> Uso pessoal. Não suba sessão de outras pessoas, não publique fork público — o conteúdo de `.browser-data/` contém cookies de login.
+Ele abre a Sala de Aula Virtual da Wyden, entra em cada disciplina, percorre os temas pendentes, espera o cronômetro e clica em concluir. Você pode trabalhar em outra coisa enquanto ele roda.
 
-## Pré-requisitos
+---
 
-- **Node.js 18+** (testado em 25)
-- **macOS, Linux ou Windows** (qualquer sistema onde o Playwright rode)
-- Conta válida na Sala de Aula Virtual
+## Início rápido
 
-Confira a versão:
-```bash
-node --version
-```
-
-## Instalação
-
-Clone o repositório e instale dependências (faz só uma vez):
+Se você só quer rodar e ver funcionando:
 
 ```bash
 git clone https://github.com/AloysioLvy/script-for-conclude.git
 cd script-for-conclude
 npm install
 npx playwright install chromium
-```
-
-## Como usar
-
-> **Importante:** todos os comandos (`npm start`, `npm install`, etc) precisam ser executados **de dentro da pasta do projeto** (`script-for-conclude/`). Se abrir um terminal novo, rode `cd caminho/para/script-for-conclude` antes.
-
-```bash
-cd script-for-conclude
 npm start
 ```
 
-O que acontece:
+Na primeira vez vai abrir uma janela do navegador — faça login normal (Microsoft / aluno), espere chegar na tela inicial com a lista de disciplinas, volte ao terminal e aperte **Enter**. Daí pode deixar rolando.
 
-1. Uma janela do **Chromium** abre em `https://estudante.wyden.com.br/inicio`.
-2. **Faça login** normalmente (Microsoft / SSO da faculdade). Login salva em `.browser-data/` — nas próximas execuções você não precisa logar de novo.
-3. Garanta que está na **tela inicial** (a com os cards de Disciplinas).
-4. Volte ao terminal e pressione **ENTER**.
-5. A partir daí, o script faz sozinho:
-   - Lê todas as disciplinas do carrossel da home (avança o carrossel sozinho se precisar)
-   - Entra em cada disciplina, uma de cada vez
-   - Dentro da disciplina, acha o próximo tema marcado como **Pendente**, abre o conteúdo
-   - **Checa o botão "Marcar como concluído" a cada 1 minuto** — quando habilitar, clica
-   - Volta pra lista de temas, processa o próximo pendente
-   - Quando acabarem os temas da disciplina, volta pra home e passa pra próxima
-6. Termina quando não houver mais disciplinas/temas pendentes (ou quando os limites configurados forem atingidos).
+---
 
-## Variáveis de ambiente
+## O que você precisa antes
 
-Todas opcionais. Passe antes de `npm start`:
+- **Node.js 18 ou mais novo** ([baixe aqui](https://nodejs.org) se não tiver)
+- Sua conta da Sala de Aula da Wyden
+- Espaço pra deixar o navegador aberto enquanto roda (o cronômetro da Wyden conta mais devagar se a janela tá minimizada)
 
-| Variável          | Default                                  | O que faz                                                       |
-|-------------------|------------------------------------------|-----------------------------------------------------------------|
-| `URL`             | `https://estudante.wyden.com.br/inicio`  | Página inicial — só altere se a Wyden mudar o domínio           |
-| `HEADLESS`        | (vazio = janela aberta)                  | `true` roda sem abrir janela visual                             |
-| `MAX_DISCIPLINAS` | `99`                                     | Quantas disciplinas processar nessa execução                    |
-| `MAX_TEMAS`       | `99`                                     | Quantos temas por disciplina                                    |
-| `MAX_TENTATIVAS`  | `30`                                     | Tentativas de 1 em 1 min antes de desistir de um tema           |
-
-### Teste antes de soltar pra todas
-
-Rode com 1 disciplina e 1 tema só, pra confirmar que os seletores estão casando:
-
+Pra conferir se o Node tá instalado:
 ```bash
-MAX_DISCIPLINAS=1 MAX_TEMAS=1 npm start
+node --version
 ```
 
-### Rodar sem janela (depois que já confirmou que funciona)
+---
 
-```bash
-HEADLESS=true npm start
-```
+## Como funciona, passo a passo
 
-## Problemas comuns
+Depois que você aperta Enter no terminal, o script:
 
-**`net::ERR_NAME_NOT_RESOLVED`**
-Você está sem internet ou o domínio mudou. Cheque a URL no navegador e passe via `URL=...`.
+1. **Lê todas as disciplinas** que aparecem no carrossel da home (se tiverem mais que cabem na tela, ele rola sozinho)
+2. **Entra na primeira disciplina** clicando em "Acessar disciplina"
+3. **Procura o próximo tema pendente** (ignora os já concluídos)
+4. **Abre o conteúdo** — se tem um drawer com vários conteúdos, ele entra no primeiro
+5. **Espera o botão habilitar**, checando de minuto em minuto e logando o tempo restante:
+   ```
+   [13:42:01] tentativa 3/30 — desabilitado — "Marcar como concluído (12:18)"
+   ```
+6. **Clica em "Marcar como concluído"** assim que pode
+7. **Volta** pra lista de temas e procura o próximo pendente
+8. Quando acabarem os temas da disciplina, **volta pra home** e passa pra próxima
+9. Termina quando não sobrar mais nada pendente
 
-**Botão "Marcar como concluído" nunca habilita**
-A Wyden exige 15 minutos no conteúdo. Se o script chega em `tentativa 16/30` ainda desabilitado, o cronômetro do servidor não está contando — geralmente porque o iframe do conteúdo perdeu foco ou a aba está minimizada. Deixe a janela visível e ativa.
+---
 
-**Login pede de novo a cada execução**
-Cookies da Microsoft expiram. É só relogar — `.browser-data/` mantém pelo tempo de vida do token (normalmente alguns dias).
+## Comandos úteis
 
-**Tela trava em "abrindo o tema..." sem mostrar drawer nem botão de concluir**
-A página pode ter mudado os seletores (`data-testid`). Abra o DevTools, inspecione o botão atual e atualize o seletor correspondente em `script.js`.
+> Lembrete: tudo isso roda **dentro da pasta do projeto**. Se abriu um terminal novo, faça `cd script-for-conclude` antes.
 
-## Estrutura
+| O que você quer fazer                     | Comando                                       |
+|-------------------------------------------|-----------------------------------------------|
+| Rodar tudo (uso normal)                   | `npm start`                                   |
+| Testar com só 1 disciplina e 1 tema       | `MAX_DISCIPLINAS=1 MAX_TEMAS=1 npm start`     |
+| Rodar sem janela (depois que confiar)     | `HEADLESS=true npm start`                     |
+| Limitar a 3 disciplinas nessa execução    | `MAX_DISCIPLINAS=3 npm start`                 |
+
+### Variáveis disponíveis
+
+| Variável          | Padrão                                  | Pra que serve                                              |
+|-------------------|------------------------------------------|------------------------------------------------------------|
+| `URL`             | `https://estudante.wyden.com.br/inicio`  | Página inicial — só mude se a Wyden trocar o domínio       |
+| `HEADLESS`        | (em branco — janela aberta)              | `true` esconde a janela do navegador                       |
+| `MAX_DISCIPLINAS` | `99`                                     | Quantas disciplinas processar                              |
+| `MAX_TEMAS`       | `99`                                     | Quantos temas por disciplina                               |
+| `MAX_TENTATIVAS`  | `30`                                     | Quantos minutos esperar em cada tema antes de desistir     |
+
+---
+
+## Quando algo dá errado
+
+**"Esperei o tempo todo e o botão não habilitou"**
+A Wyden só conta o tempo se a janela estiver ativa. Deixa a janela visível e não minimiza.
+
+**"Pede pra fazer login toda hora"**
+Cookies da Microsoft expiram depois de alguns dias. É só relogar quando aparecer.
+
+**"Travou em 'abrindo o tema...'"**
+A Wyden pode ter mudado algum botão no site. Abre o DevTools (F12), inspeciona o botão que era pra ser clicado e atualiza o seletor lá no `script.js`.
+
+**"net::ERR_NAME_NOT_RESOLVED"**
+Sem internet, ou a URL mudou. Confere a URL no navegador e passa via `URL=...`.
+
+---
+
+## Quero parar no meio
+
+`Ctrl+C` no terminal. Pode parar tranquilo — quando rodar de novo, ele recomeça pelo próximo tema marcado como Pendente, então nada é duplicado.
+
+---
+
+## Estrutura do projeto
 
 ```
 script-for-conclude/
-├── script.js              # Toda a lógica de automação
-├── package.json
-├── README.md
-├── .gitignore             # ignora .browser-data e node_modules
-└── .browser-data/         # criado no 1º run, guarda sessão do Chromium (NÃO commitar)
+├── script.js          # Toda a automação
+├── package.json       # Dependências
+├── README.md          # Você está aqui
+├── .gitignore         # Não sobe sessão de login nem node_modules
+└── .browser-data/     # Criado no primeiro run, guarda seu login (não commitar)
 ```
 
-## Como parar no meio da execução
+---
 
-`Ctrl+C` no terminal. Na próxima execução ele recomeça do tema pendente mais próximo (ele sempre busca pelo "Pendente", então não duplica conclusões).
+## Aviso
+
+Esse repositório é privado e é pra **uso pessoal**. Não compartilhe sua pasta `.browser-data/` — ela contém os cookies de login da sua conta. Não publique fork público — fica óbvio o que o script faz.
